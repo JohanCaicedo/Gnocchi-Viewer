@@ -23,8 +23,8 @@ private:
 
     int capWidth = 1920;
     int capHeight = 1080;
-    int srWidth = 2560;
-    int srHeight = 1440;
+    int srWidth = 3840;
+    int srHeight = 2160;
 
     std::vector<DeviceInfo> devices; // Lista de capturadoras
 

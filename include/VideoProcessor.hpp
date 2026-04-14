@@ -9,10 +9,10 @@ public:
     ~VideoProcessor();
 
     // Inicializa el upscaler GPU
-    bool initUpscaler(int srcW, int srcH, int dstW, int dstH, int quality = 1);
+    bool initUpscaler(int srcW, int srcH, int dstW, int dstH, int quality = GPUUpscaler::kModeHighBitrateUltra);
 
     // Inicializa el denoiser GPU
-    bool initDenoiser(int width, int height, float strength = 1.0f);
+    bool initDenoiser(int width, int height, float strength = 0.0f);
 
     // Procesa el frame. enableAI: Super Resolution. enableDenoise: Reduccion de ruido.
     // Si ambos estan activos, el orden es: Denoise -> Upscale.

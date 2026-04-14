@@ -10,6 +10,29 @@
 // Requerido por el proxy para localizar las DLLs del SDK
 char* g_nvVFXSDKPath = NULL;
 
+static const char* getQualityModeName(int qualityMode) {
+    switch (qualityMode) {
+    case 0:  return "VSR_Bicubic";
+    case 1:  return "VSR_Low";
+    case 2:  return "VSR_Medium";
+    case 3:  return "VSR_High";
+    case 4:  return "VSR_Ultra";
+    case 8:  return "Denoise_Low";
+    case 9:  return "Denoise_Medium";
+    case 10: return "Denoise_High";
+    case 11: return "Denoise_Ultra";
+    case 12: return "Deblur_Low";
+    case 13: return "Deblur_Medium";
+    case 14: return "Deblur_High";
+    case 15: return "Deblur_Ultra";
+    case 16: return "HighBitrate_Low";
+    case 17: return "HighBitrate_Medium";
+    case 18: return "HighBitrate_High";
+    case 19: return "HighBitrate_Ultra";
+    default: return "Unknown";
+    }
+}
+
 // Helper: construir la ruta absoluta del SDK relativo al .exe
 static std::string getSDKBinPath() {
 #ifdef _WIN32
@@ -93,6 +116,8 @@ bool GPUUpscaler::initialize(int srcWidth, int srcHeight, int dstWidth, int dstH
     std::cout << "[GPU] Inicializando NVIDIA VFX Super Resolution..." << std::endl;
     std::cout << "[GPU] Escalado: " << srcWidth << "x" << srcHeight 
               << " -> " << dstWidth << "x" << dstHeight << std::endl;
+    std::cout << "[GPU] Modo VSR: " << getQualityModeName(qualityMode)
+              << " (" << qualityMode << ")" << std::endl;
 
     // ============================================
     // Configurar rutas del SDK ANTES de crear el efecto
@@ -165,7 +190,7 @@ bool GPUUpscaler::initialize(int srcWidth, int srcHeight, int dstWidth, int dstH
     err = NvVFX_SetCudaStream(effect, NVVFX_CUDA_STREAM, stream);
     if (err != NVCV_SUCCESS) { return failStatus("[GPU] Error SetCudaStream: ", err); }
 
-    // Modo de calidad: 0=Bicubic, 1=Low, 2=Medium, 3=High, 4=Ultra
+    // Modo de calidad: 0-4=VSR, 16-19=HighBitrate
     err = NvVFX_SetU32(effect, NVVFX_QUALITY_LEVEL, (unsigned int)qualityMode);
     if (err != NVCV_SUCCESS) { return failStatus("[GPU] Error SetU32 quality: ", err); }
 
@@ -183,7 +208,8 @@ bool GPUUpscaler::initialize(int srcWidth, int srcHeight, int dstWidth, int dstH
     }
 
     initialized = true;
-    std::cout << "[GPU] Super Resolution ACTIVA! Modo calidad: " << qualityMode << std::endl;
+    std::cout << "[GPU] Super Resolution ACTIVA! Modo: "
+              << getQualityModeName(qualityMode) << std::endl;
     return true;
 }
 

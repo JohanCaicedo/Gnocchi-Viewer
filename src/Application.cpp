@@ -85,7 +85,7 @@ void Application::handleInput(bool& captureActive) {
                 bool denoiseReady = videoProcessor.isDenoiserReady();
                 if (!denoiseReady) {
                     std::cout << "Inicializando Denoise..." << std::endl;
-                    denoiseReady = videoProcessor.initDenoiser(capWidth, capHeight, 1.0f);
+                    denoiseReady = videoProcessor.initDenoiser(capWidth, capHeight, 0.0f);
                 }
 
                 if (!denoiseReady) {
@@ -104,9 +104,9 @@ void Application::handleInput(bool& captureActive) {
             if (!enableAI) {
                 bool upscalerReady = videoProcessor.isUpscalerReady();
                 if (!upscalerReady) {
-                    // Primera vez: inicializar el upscaler 1080p -> 2K
+                    // Primera vez: inicializar el upscaler 1080p -> 4K con sesgo a calidad visual.
                     std::cout << "Inicializando Super Resolution..." << std::endl;
-                    upscalerReady = videoProcessor.initUpscaler(capWidth, capHeight, srWidth, srHeight, 1);
+                    upscalerReady = videoProcessor.initUpscaler(capWidth, capHeight, srWidth, srHeight, GPUUpscaler::kModeHighBitrateUltra);
                 }
 
                 if (!upscalerReady) {

@@ -15,8 +15,8 @@ public:
 
     // Inicializa el efecto de Denoise
     // width/height: resolucion del video (entrada = salida)
-    // strength: fuerza del filtro 0.0 (suave) a 1.0 (maximo)
-    bool initialize(int width, int height, float strength = 1.0f);
+    // strength: 0.0 preserva mas textura, 1.0 elimina mas ruido
+    bool initialize(int width, int height, float strength = 0.0f);
 
     // Aplica denoise a un frame. Requiere que initialize() haya sido llamado
     bool denoise(const cv::Mat& input, cv::Mat& output);
