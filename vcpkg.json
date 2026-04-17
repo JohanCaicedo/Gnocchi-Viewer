@@ -11,7 +11,9 @@
                 "png",
                 "dshow",
                 "msmf",
-                "win32ui"
+                "win32ui",
+                "dnn",
+                "contrib"
             ]
         }
     ]

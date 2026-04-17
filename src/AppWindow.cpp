@@ -6,7 +6,9 @@ AppWindow::AppWindow(const std::string& windowName) : name(windowName), isFullsc
 }
 
 AppWindow::~AppWindow() {
-    cv::destroyWindow(name);
+    try {
+        cv::destroyAllWindows();
+    } catch (...) {}
 }
 
 void AppWindow::show(const cv::Mat& frame) {

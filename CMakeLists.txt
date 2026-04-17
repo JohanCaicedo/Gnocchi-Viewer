@@ -42,6 +42,7 @@ set(SOURCES
     src/Application.cpp
     src/GPUUpscaler.cpp
     src/GPUDenoiser.cpp
+    src/OpenCVUpscaler.cpp
     src/AudioManager.cpp
     src/ConfigManager.cpp
     resource.rc
@@ -52,6 +53,7 @@ set(SOURCES
 
 # Ejecutable
 add_executable(AILinkCapture ${SOURCES})
+set_target_properties(AILinkCapture PROPERTIES OUTPUT_NAME "Gnocchi's Viewer")
 
 # Conectar OpenCV
 target_link_libraries(AILinkCapture PRIVATE ${OpenCV_LIBS})
@@ -64,4 +66,31 @@ if(MSVC)
     # Aplicar optimizacion /O2 solo en Release para no chocar con /RTC1 en Debug
     target_compile_options(AILinkCapture PRIVATE $<$<CONFIG:Release>:/O2>)
 endif()
+
+# ============================================================
+# AUTONOMIA DEL EJECUTABLE POST-BUILD (PORTABILIDAD)
+# ============================================================
+# Le decimos a CMake que arrastre automáticamente todo el ecosistema de 
+# NVIDIA (Modelos de IA .TRT y los nucleos .DLL) y los empaquete justo 
+# al lado del ejecutable final cada vez que compiles.
+add_custom_command(TARGET AILinkCapture POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${VFXSDK_ROOT}/bin"
+        "$<TARGET_FILE_DIR:AILinkCapture>"
+    COMMENT "Haciendo la aplicacion portable: Empaquetando DLLs y Modelos de NVIDIA IA..."
+)
+
+add_custom_command(TARGET AILinkCapture POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${VFXSDK_ROOT}/features/nvvfxvideosuperres/bin"
+        "$<TARGET_FILE_DIR:AILinkCapture>"
+    COMMENT "Empaquetando NVIDIA VideoSuperRes Plugin..."
+)
+
+add_custom_command(TARGET AILinkCapture POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${VFXSDK_ROOT}/features/nvvfxdenoising/bin"
+        "$<TARGET_FILE_DIR:AILinkCapture>"
+    COMMENT "Empaquetando NVIDIA Denoising Plugin..."
+)
 

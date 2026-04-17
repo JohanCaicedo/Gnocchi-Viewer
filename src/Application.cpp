@@ -22,7 +22,7 @@ LRESULT CALLBACK CustomWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 }
 
 Application::Application(int deviceIndex) 
-    : isRunning(false), enableAA(false), enableAI(false), enableDenoise(false), 
+    : isRunning(false), enableAA(false), enableDenoise(false), currentAIType(AIType::NONE),
       appWindow("Visor"), pendingCaptureRestart(false), pendingAIInit(false), pendingDenoiseInit(false), pendingScreenshot(false) {
     
     devices = CaptureManager::getAvailableDevices();
@@ -37,7 +37,7 @@ Application::Application(int deviceIndex)
         this->srHeight = cfg.srHeight;
         this->denoiseStrength = cfg.denoiseStrength;
         this->enableDenoise = cfg.enableDenoise;
-        this->enableAI = cfg.enableAI;
+        this->currentAIType = cfg.enableAI ? AIType::NVIDIA_RTX : AIType::NONE; // retro-comp
         this->enableAA = cfg.enableAA;
         this->forceMjpg = cfg.forceMjpg;
     } else {
@@ -98,13 +98,14 @@ void Application::setupNativeMenu() {
     AppendMenuA(hMenuAI, MF_STRING, IDM_AA_TOGGLE, "AA Lanczos 4");
 
     // 3.3 Super Resolución
-    HMENU hMenuSR = CreatePopupMenu();
-    AppendMenuA(hMenuSR, MF_STRING, IDM_AI_TOGGLE, "Activar RTX_VSR");
-    AppendMenuA(hMenuSR, MF_SEPARATOR, 0, NULL);
-    AppendMenuA(hMenuSR, MF_STRING, IDM_TARGET_1080, "Objetivo 1080p");
-    AppendMenuA(hMenuSR, MF_STRING, IDM_TARGET_1440, "Objetivo 1440p");
-    AppendMenuA(hMenuSR, MF_STRING, IDM_TARGET_2160, "Objetivo 4K");
-    AppendMenuA(hMenuAI, MF_POPUP, (UINT_PTR)hMenuSR, "Super Res (NVIDIA)");
+    HMENU hMenuUpscaling = CreatePopupMenu();
+    AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_RTX_TOGGLE, "Activar IA: NVIDIA RTX VSR");
+    AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_FSRCNN_TOGGLE, "Activar IA: Universal FSRCNN (Lento)");
+    AppendMenuA(hMenuUpscaling, MF_SEPARATOR, 0, NULL);
+    AppendMenuA(hMenuUpscaling, MF_STRING, IDM_TARGET_1080, "Resolucion Destino: 1080p");
+    AppendMenuA(hMenuUpscaling, MF_STRING, IDM_TARGET_1440, "Objetivo 1440p");
+    AppendMenuA(hMenuUpscaling, MF_STRING, IDM_TARGET_2160, "Objetivo 4K");
+    AppendMenuA(hMenuAI, MF_POPUP, (UINT_PTR)hMenuUpscaling, "Super Res (NVIDIA)");
 
     AppendMenuA(g_hMenu, MF_POPUP, (UINT_PTR)hMenuAI, "Procesamiento IA");
 
@@ -147,10 +148,9 @@ void Application::updateMenuChecks() {
     CheckMenuItem(g_hMenu, IDM_DENOISE_00, MF_BYCOMMAND | (denoiseStrength == 0.0f ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_DENOISE_05, MF_BYCOMMAND | (denoiseStrength == 0.5f ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_DENOISE_10, MF_BYCOMMAND | (denoiseStrength == 1.0f ? MF_CHECKED : MF_UNCHECKED));
-
+    CheckMenuItem(g_hMenu, IDM_AI_RTX_TOGGLE, MF_BYCOMMAND | (currentAIType == AIType::NVIDIA_RTX ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_AI_FSRCNN_TOGGLE, MF_BYCOMMAND | (currentAIType == AIType::OPENCV_FSRCNN ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_AA_TOGGLE, MF_BYCOMMAND | (enableAA ? MF_CHECKED : MF_UNCHECKED));
-
-    CheckMenuItem(g_hMenu, IDM_AI_TOGGLE, MF_BYCOMMAND | (enableAI ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_TARGET_1080, MF_BYCOMMAND | (srWidth == 1920 ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_TARGET_1440, MF_BYCOMMAND | (srWidth == 2560 ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_TARGET_2160, MF_BYCOMMAND | (srWidth == 3840 ? MF_CHECKED : MF_UNCHECKED));
@@ -180,12 +180,17 @@ void Application::handleWin32Command(int menuId) {
     else if (menuId == IDM_DENOISE_10) { denoiseStrength = 1.0f; enableDenoise = false; videoProcessor.releaseDenoiser(); pendingDenoiseInit = true; }
     // 4. AA & SR
     else if (menuId == IDM_AA_TOGGLE) { enableAA = !enableAA; }
-    else if (menuId == IDM_AI_TOGGLE) {
-        if (!enableAI) { pendingAIInit = true; } else { enableAI = false; }
+    else if (menuId == IDM_AI_RTX_TOGGLE) {
+        if (currentAIType != AIType::NVIDIA_RTX) { currentAIType = AIType::NVIDIA_RTX; pendingAIInit = true; } 
+        else { currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
     }
-    else if (menuId == IDM_TARGET_1080) { srWidth = 1920; srHeight = 1080; enableAI = false; videoProcessor.releaseUpscaler(); }
-    else if (menuId == IDM_TARGET_1440) { srWidth = 2560; srHeight = 1440; enableAI = false; videoProcessor.releaseUpscaler(); }
-    else if (menuId == IDM_TARGET_2160) { srWidth = 3840; srHeight = 2160; enableAI = false; videoProcessor.releaseUpscaler(); }
+    else if (menuId == IDM_AI_FSRCNN_TOGGLE) {
+        if (currentAIType != AIType::OPENCV_FSRCNN) { currentAIType = AIType::OPENCV_FSRCNN; pendingAIInit = true; } 
+        else { currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
+    }
+    else if (menuId == IDM_TARGET_1080) { srWidth = 1920; srHeight = 1080; currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
+    else if (menuId == IDM_TARGET_1440) { srWidth = 2560; srHeight = 1440; currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
+    else if (menuId == IDM_TARGET_2160) { srWidth = 3840; srHeight = 2160; currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
     // 5. Config
     else if (menuId == IDM_SAVE_CONFIG) {
         AppConfig cfg;
@@ -196,7 +201,7 @@ void Application::handleWin32Command(int menuId) {
         cfg.srWidth = srWidth;
         cfg.srHeight = srHeight;
         cfg.enableDenoise = enableDenoise;
-        cfg.enableAI = enableAI;
+        cfg.enableAI = (currentAIType != AIType::NONE);
         cfg.enableAA = enableAA;
         cfg.forceMjpg = forceMjpg;
         ConfigManager::saveConfig("config.ini", cfg);
@@ -227,10 +232,10 @@ void Application::run() {
         captureActive = captureManager.initialize(devices[deviceIndex].hwIndex, capWidth, capHeight, capFps, forceMjpg);
         if (captureActive) {
             std::string devName = devices[deviceIndex].name;
-            std::wstring wideTitle = L"\u00D1oquis Viwer - " + std::wstring(devName.begin(), devName.end());
+            std::wstring wideTitle = L"Gnocchi's Viewer - " + std::wstring(devName.begin(), devName.end());
             SetWindowTextW(g_hwnd, wideTitle.c_str());
             audioManager.start();
-            if (enableAI) pendingAIInit = true;
+            if (currentAIType != AIType::NONE) pendingAIInit = true;
             if (enableDenoise) pendingDenoiseInit = true;
         }
     }
@@ -242,9 +247,9 @@ void Application::run() {
             std::cout << "Reiniciando captura de video..." << std::endl;
             captureManager.release();
             audioManager.stop();
-            bool oldAI = enableAI;
+            AIType oldAI = currentAIType;
             bool oldDenoise = enableDenoise;
-            enableAI = false;
+            currentAIType = AIType::NONE;
             enableDenoise = false;
             videoProcessor.releaseUpscaler();
             videoProcessor.releaseDenoiser();
@@ -252,10 +257,10 @@ void Application::run() {
                 captureActive = captureManager.initialize(devices[deviceIndex].hwIndex, capWidth, capHeight, capFps, forceMjpg);
                 if (captureActive) {
                     std::string devName = devices[deviceIndex].name;
-                    std::wstring wideTitle = L"\u00D1oquis Viwer - " + std::wstring(devName.begin(), devName.end());
+                    std::wstring wideTitle = L"Gnocchi's Viewer - " + std::wstring(devName.begin(), devName.end());
                     SetWindowTextW(g_hwnd, wideTitle.c_str());
                     audioManager.start();
-                    if (oldAI) pendingAIInit = true;
+                    if (oldAI != AIType::NONE) pendingAIInit = true;
                     if (oldDenoise) pendingDenoiseInit = true;
                 }
             }
@@ -264,10 +269,11 @@ void Application::run() {
         }
 
         if (pendingAIInit) {
-            std::cout << "Inicializando Super Resolution..." << std::endl;
-            bool ready = videoProcessor.isUpscalerReady();
-            if (!ready) ready = videoProcessor.initUpscaler(capWidth, capHeight, srWidth, srHeight, GPUUpscaler::kModeMjpegDefault);
-            enableAI = ready;
+            std::cout << "[App] Inicializando modelo SuperResolucion IA: " << (int)currentAIType << " ..." << std::endl;
+            if (!videoProcessor.initUpscaler(capWidth, capHeight, srWidth, srHeight, currentAIType)) {
+                std::cout << "[App] Upscaler Fallo! Apagando flag." << std::endl;
+                currentAIType = AIType::NONE;
+            }
             pendingAIInit = false;
             updateMenuChecks();
         }
@@ -291,16 +297,16 @@ void Application::run() {
 
         auto start = std::chrono::high_resolution_clock::now();
         
-        videoProcessor.processFrame(frame, processedFrame, enableAI && captureActive, enableDenoise && captureActive);
+        videoProcessor.processFrame(frame, processedFrame, currentAIType, enableDenoise && captureActive);
         
         auto end = std::chrono::high_resolution_clock::now();
         double elapsedMs = std::chrono::duration<double, std::milli>(end - start).count();
 
         static std::ofstream profilerLog("capturadora_rendimiento.log");
-        if ((enableAI || enableDenoise) && captureActive) {
+        if ((currentAIType != AIType::NONE || enableDenoise) && captureActive) {
             profilerLog << "[Profiler] Pipeline IA tomo: " << elapsedMs 
                         << " ms | Denoise: " << (enableDenoise ? "ON" : "OFF") 
-                        << " | VSR: " << (enableAI ? "ON" : "OFF") << std::endl;
+                        << " | VSR (" << (int)currentAIType << ")" << std::endl;
         }
 
         cv::Mat displayFrame = processedFrame;

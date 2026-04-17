@@ -24,7 +24,8 @@
 
 #define IDM_AA_TOGGLE 4000
 
-#define IDM_AI_TOGGLE 5000
+#define IDM_AI_RTX_TOGGLE 5000
+#define IDM_AI_FSRCNN_TOGGLE 5004
 #define IDM_TARGET_1080 5001
 #define IDM_TARGET_1440 5002
 #define IDM_TARGET_2160 5003
@@ -48,9 +49,9 @@ private:
     int deviceIndex;
     bool isRunning;
     bool enableAA; 
-    bool enableAI;
     bool enableDenoise; 
     bool forceMjpg;
+    AIType currentAIType;
 
     int capWidth = 1920;
     int capHeight = 1080;

@@ -1,22 +1,28 @@
 #pragma once
 #include <opencv2/opencv.hpp>
-#include "GPUUpscaler.hpp"
 #include "GPUDenoiser.hpp"
+#include "GPUUpscaler.hpp"
+#include "OpenCVUpscaler.hpp"
+
+enum class AIType {
+    NONE = 0,
+    NVIDIA_RTX = 1,
+    OPENCV_FSRCNN = 2
+};
 
 class VideoProcessor {
 public:
     VideoProcessor();
     ~VideoProcessor();
 
-    // Inicializa el upscaler GPU
-    bool initUpscaler(int srcW, int srcH, int dstW, int dstH, int quality = GPUUpscaler::kModeMjpegDefault);
+    // Inicializa el escalador (FSRCNN o NVIDIA)
+    bool initUpscaler(int inWidth, int inHeight, int outWidth, int outHeight, AIType type = AIType::NVIDIA_RTX, int quality = GPUUpscaler::kModeMjpegDefault);
 
     // Inicializa el denoiser GPU
     bool initDenoiser(int width, int height, float strength = 0.0f);
 
-    // Procesa el frame. enableAI: Super Resolution. enableDenoise: Reduccion de ruido.
-    // Si ambos estan activos, el orden es: Denoise -> Upscale.
-    void processFrame(const cv::Mat& inputFrame, cv::Mat& outputFrame, bool enableAI, bool enableDenoise = false);
+    // Procesa el frame (Cadena de IA)
+    void processFrame(const cv::Mat& inFrame, cv::Mat& outFrame, AIType upscalerType, bool enableDenoise = false);
 
     // Destruye el upscaler para cambiar resoluciones
     void releaseUpscaler();
@@ -33,5 +39,10 @@ public:
 private:
     GPUUpscaler upscaler;
     GPUDenoiser denoiser;
-    cv::Mat     denoisedTemp; // Buffer intermedio cuando usamos ambos efectos
+    OpenCVUpscaler cvUpscaler;
+    
+    cv::Mat denoiseInternalOutput;
+    
+    // Dimensiones para FSRCNN / RTX
+    int upOutW, upOutH;
 };
