@@ -42,7 +42,9 @@ private:
     OpenCVUpscaler cvUpscaler;
     
     cv::Mat denoiseInternalOutput;
+    cv::Mat fsrcnnInternalOutput;
     
     // Dimensiones para FSRCNN / RTX
     int upOutW, upOutH;
+    bool fsrcnnEnabled;
 };

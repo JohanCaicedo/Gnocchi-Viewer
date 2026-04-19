@@ -34,19 +34,17 @@ static const char* getQualityModeName(int qualityMode) {
 }
 
 // Helper: construir la ruta absoluta del SDK relativo al .exe
+static std::string getProjectDir() {
+#ifdef _WIN32
+    return CAPTURADORA_PROJECT_DIR;
+#else
+    return "";
+#endif
+}
+
 static std::string getSDKBinPath() {
 #ifdef _WIN32
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(NULL, exePath, MAX_PATH);
-    std::string exeDir(exePath);
-    size_t lastSlash = exeDir.find_last_of("\\/");
-    exeDir = exeDir.substr(0, lastSlash);
-    // Subimos 2 niveles: build/Release -> raiz del proyecto
-    size_t s1 = exeDir.find_last_of("\\/");
-    std::string buildDir = exeDir.substr(0, s1);
-    s1 = buildDir.find_last_of("\\/");
-    std::string projectDir = buildDir.substr(0, s1);
-    return projectDir + "\\NVIDIA Video Effects\\bin";
+    return getProjectDir() + "\\NVIDIA Video Effects\\bin";
 #else
     return "";
 #endif
@@ -54,33 +52,7 @@ static std::string getSDKBinPath() {
 
 static std::string getSDKFeaturePath() {
 #ifdef _WIN32
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(NULL, exePath, MAX_PATH);
-    std::string exeDir(exePath);
-    size_t lastSlash = exeDir.find_last_of("\\/");
-    exeDir = exeDir.substr(0, lastSlash);
-    size_t s1 = exeDir.find_last_of("\\/");
-    std::string buildDir = exeDir.substr(0, s1);
-    s1 = buildDir.find_last_of("\\/");
-    std::string projectDir = buildDir.substr(0, s1);
-    return projectDir + "\\NVIDIA Video Effects\\features\\nvvfxvideosuperres\\bin";
-#else
-    return "";
-#endif
-}
-
-static std::string getSDKModelPath() {
-#ifdef _WIN32
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(NULL, exePath, MAX_PATH);
-    std::string exeDir(exePath);
-    size_t lastSlash = exeDir.find_last_of("\\/");
-    exeDir = exeDir.substr(0, lastSlash);
-    size_t s1 = exeDir.find_last_of("\\/");
-    std::string buildDir = exeDir.substr(0, s1);
-    s1 = buildDir.find_last_of("\\/");
-    std::string projectDir = buildDir.substr(0, s1);
-    return projectDir + "\\NVIDIA Video Effects\\models";
+    return getProjectDir() + "\\NVIDIA Video Effects\\features\\nvvfxvideosuperres\\bin";
 #else
     return "";
 #endif

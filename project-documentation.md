@@ -1,51 +1,80 @@
-# Especificación Técnica: AI-Link Capture
+# Especificacion Tecnica: Gnocchi's Viewer
 
-## 1. Objetivo del Proyecto
-Desarrollar una aplicación de visualización de video de latencia ultra baja para consolas, diseñada para transformar una señal comprimida de baja calidad (USB 2.0) en una imagen de alta fidelidad mediante reconstrucción por inteligencia arificial NVIDIA.
+## Objetivo
 
-## 2. Tecnologías y Herramientas
-* **Lenguaje:** C++17 (Optimización de memoria y velocidad nativa).
-* **Captura:** OpenCV con Backend DirectShow (Acceso directo al hardware en Windows).
-* **Procesamiento:** NVIDIA CUDA / TensorRT (Para ejecutar la IA en los núcleos de la GPU).
-* **Gestión:** CMake y vcpkg (Automatización de dependencias).
+Construir un visor de capturadoras para Windows con latencia baja, usando una ruta de video directa y filtros opcionales de limpieza y escalado por IA.
 
----
+## Stack actual
 
-## 3. Arquitectura del Pipeline (El "Momento" de la IA)
+- `C++17`
+- `OpenCV`
+- `Media Foundation` a traves de `CAP_MSMF`
+- `NVIDIA Video Effects SDK`
+- `CUDA Runtime`
+- `miniaudio`
+- `Win32 API`
 
-El escalado con IA ocurre en la **Etapa de Post-procesamiento**. Este es el flujo exacto que sigue cada frame de video:
+## Pipeline
 
-1.  **Ingesta (Capture):** El programa extrae el frame comprimido en formato MJPEG desde el puerto USB.
-2.  **Conversión (Decoding):** El frame se descomprime y se transforma en un formato que la tarjeta de video pueda entender (RGB/YUV).
-3.  **Transferencia a VRAM:** El frame se envía de la memoria RAM del sistema a la memoria de la tarjeta de video (GPU).
-4.  **ETAPA DE IA (Inferencia):** * **Aquí es donde entra la IA.** El procesador de la tarjeta de video toma el frame de 1080p y, mediante una red neuronal, "reconstruye" los píxeles perdidos por la compresión y escala la imagen.
-    * Este proceso es instantáneo gracias a los núcleos dedicados de las GPUs modernas.
-5.  **Renderizado (Display):** La imagen ya mejorada se dibuja directamente en la ventana de la aplicación.
+1. Apertura de la capturadora con `CAP_MSMF`.
+2. Configuracion de resolucion, FPS y MJPEG.
+3. Captura con buffer size de `1`.
+4. Procesamiento opcional:
+   - Denoise NVIDIA
+   - RTX VSR
+   - FSRCNN
+   - Lanczos 4
+5. Render en ventana OpenCV.
 
+## Modulos
 
+### CaptureManager
 
----
+- Detecta capturadoras disponibles.
+- Usa nombres reales de Media Foundation cuando estan disponibles.
+- Inicializa la captura con `CAP_MSMF`.
+- Fuerza `MJPEG` cuando corresponde.
 
-## 4. Funcionamiento y Características
-* **Modo Zen (Interfaz Invisible):** El programa inicia con una ventana de visualización pura. Los controles de configuración solo son visibles bajo demanda para no distraer del juego.
-* **Zero-Buffer Logic:** A diferencia de programas de grabación (como OBS), este programa no guarda video en el disco duro, lo que elimina el retraso (lag) de procesamiento.
-* **Escalado Inteligente:** Utiliza algoritmos de super-resolución que analizan los bordes de los objetos en el juego (como los personajes de la Switch) para evitar que se vean borrosos.
+### VideoProcessor
 
-## 5. Controles de Usuario
-* **Alternar Pantalla Completa:** Se utiliza la tecla `ESC` para ocultar instantáneamente todos los elementos de Windows (bordes, barra de tareas) y centrar el juego.
-* **Activación de IA:** Un interruptor rápido (tecla `F`) permite comparar en tiempo real la imagen original "sucia" del USB contra la imagen procesada por la IA.
-* **Cierre Seguro:** Salida inmediata del programa liberando los recursos de la capturadora para evitar bloqueos del dispositivo.
+- Orquesta `GPUDenoiser`, `GPUUpscaler` y `OpenCVUpscaler`.
+- Mantiene el encadenamiento `Denoise -> RTX` con paso por VRAM.
+- Para `FSRCNN`, aplica el modelo disponible y luego ajusta siempre al tamano objetivo final.
 
----
+### GPUDenoiser
 
-## 6. Hitos de Desarrollo
-1.  Configuración del entorno de compilación C++.
-2.  Implementación de la captura estable a 60 FPS.
-3.  Desarrollo del sistema de ventana "Borderless Fullscreen".
-4.  Integración del filtro de reconstrucción acelerado por GPU.
+- Inicializa el efecto NVIDIA.
+- Ajusta `PATH` para que Windows encuentre las DLLs del SDK.
+- Libera todos los recursos GPU en `release()`.
 
-# 1. Configurar el proyecto (detecta los cambios en CMakeLists y la ruta del SDK)
-cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=g:\dev\vcpkg\scripts\buildsystems\vcpkg.cmake
+### GPUUpscaler
 
-# 2. Compilar la aplicación en modo Release
-cmake --build build --config Release
+- Inicializa RTX Video Super Resolution.
+- Usa la raiz `NVIDIA Video Effects` del proyecto.
+- Libera buffers y stream en `release()`.
+
+### AudioManager
+
+- Usa `miniaudio` en modo duplex.
+- Intenta empatar el audio con la capturadora de video elegida.
+- Si no encuentra coincidencia clara, usa un fallback heuristico.
+
+### Application
+
+- Controla el loop principal.
+- Inyecta un menu Win32 sobre la ventana OpenCV.
+- Guarda y restaura configuracion en `config.ini`.
+
+## UX actual
+
+- `ESC` alterna fullscreen.
+- `Q` cierra la aplicacion.
+- Menu superior para dispositivo, ingesta, IA, opciones y herramientas.
+- Capturas en disco bajo `capturas\`.
+
+## Restricciones importantes
+
+- No introducir buffering adicional en la ruta de video ni de audio.
+- Mantener la manipulacion dinamica de `PATH` para NVIDIA VFX.
+- No romper la separacion de formatos y buffers esperada por el pipeline GPU.
+- No sustituir `CAP_MSMF` en la ingesta USB del proyecto.

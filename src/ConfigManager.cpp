@@ -9,6 +9,7 @@ AppConfig ConfigManager::loadConfig(const std::string& filepath) {
     if (!file.is_open()) {
         return config; // Regresa default
     }
+    config.loaded = true;
 
     std::string line;
     while (std::getline(file, line)) {
@@ -27,12 +28,14 @@ AppConfig ConfigManager::loadConfig(const std::string& filepath) {
 
         try {
             if (key == "deviceIndex") config.deviceIndex = std::stoi(value);
+            else if (key == "deviceHwIndex") config.deviceHwIndex = std::stoi(value);
             else if (key == "capWidth") config.capWidth = std::stoi(value);
             else if (key == "capHeight") config.capHeight = std::stoi(value);
             else if (key == "capFps") config.capFps = std::stoi(value);
             else if (key == "srWidth") config.srWidth = std::stoi(value);
             else if (key == "srHeight") config.srHeight = std::stoi(value);
             else if (key == "denoiseStrength") config.denoiseStrength = std::stof(value);
+            else if (key == "aiType") config.aiType = std::stoi(value);
             else if (key == "enableDenoise") config.enableDenoise = (value == "1" || value == "true");
             else if (key == "enableAI") config.enableAI = (value == "1" || value == "true");
             else if (key == "enableAA") config.enableAA = (value == "1" || value == "true");
@@ -52,12 +55,14 @@ void ConfigManager::saveConfig(const std::string& filepath, const AppConfig& con
     }
 
     file << "deviceIndex=" << config.deviceIndex << "\n";
+    file << "deviceHwIndex=" << config.deviceHwIndex << "\n";
     file << "capWidth=" << config.capWidth << "\n";
     file << "capHeight=" << config.capHeight << "\n";
     file << "capFps=" << config.capFps << "\n";
     file << "srWidth=" << config.srWidth << "\n";
     file << "srHeight=" << config.srHeight << "\n";
     file << "denoiseStrength=" << config.denoiseStrength << "\n";
+    file << "aiType=" << config.aiType << "\n";
     file << "enableDenoise=" << (config.enableDenoise ? "1" : "0") << "\n";
     file << "enableAI=" << (config.enableAI ? "1" : "0") << "\n";
     file << "enableAA=" << (config.enableAA ? "1" : "0") << "\n";

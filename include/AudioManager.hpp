@@ -1,17 +1,18 @@
 #pragma once
+#include <string>
 
 class AudioManager {
 public:
     AudioManager();
     ~AudioManager();
 
-    // Inicia el puente de audio (capturadora USB -> audífonos)
-    bool start();
+    // Inicia el puente de audio (capturadora USB -> audifonos)
+    bool start(const std::string& preferredCaptureName = "");
 
     // Detiene el audio
     void stop();
 
 private:
-    void* miniaudioDevice; 
+    void* miniaudioDevice;
     bool isRunning;
 };

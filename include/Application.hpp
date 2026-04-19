@@ -72,7 +72,7 @@ private:
     bool pendingDenoiseInit;
     bool pendingScreenshot;
 
-    void handleInput(bool& captureActive);
+    void handleInput();
     
     // Win32 Menu Integration
     void setupNativeMenu();

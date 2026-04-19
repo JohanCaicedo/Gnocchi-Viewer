@@ -28,8 +28,7 @@ Application::Application(int deviceIndex)
     devices = CaptureManager::getAvailableDevices();
 
     AppConfig cfg = ConfigManager::loadConfig("config.ini");
-    if (cfg.deviceIndex != -1) {
-        this->deviceIndex = cfg.deviceIndex;
+    if (cfg.loaded) {
         this->capWidth = cfg.capWidth;
         this->capHeight = cfg.capHeight;
         this->capFps = cfg.capFps;
@@ -37,9 +36,35 @@ Application::Application(int deviceIndex)
         this->srHeight = cfg.srHeight;
         this->denoiseStrength = cfg.denoiseStrength;
         this->enableDenoise = cfg.enableDenoise;
-        this->currentAIType = cfg.enableAI ? AIType::NVIDIA_RTX : AIType::NONE; // retro-comp
         this->enableAA = cfg.enableAA;
         this->forceMjpg = cfg.forceMjpg;
+
+        const bool hasStoredHwIndex = cfg.deviceHwIndex >= 0;
+        this->deviceIndex = -1;
+        if (hasStoredHwIndex) {
+            for (size_t i = 0; i < devices.size(); ++i) {
+                if (devices[i].hwIndex == cfg.deviceHwIndex) {
+                    this->deviceIndex = static_cast<int>(i);
+                    break;
+                }
+            }
+        }
+
+        if (this->deviceIndex < 0 && cfg.deviceIndex >= 0 && cfg.deviceIndex < (int)devices.size()) {
+            this->deviceIndex = cfg.deviceIndex;
+        }
+
+        switch (cfg.aiType) {
+        case static_cast<int>(AIType::NVIDIA_RTX):
+            this->currentAIType = AIType::NVIDIA_RTX;
+            break;
+        case static_cast<int>(AIType::OPENCV_FSRCNN):
+            this->currentAIType = AIType::OPENCV_FSRCNN;
+            break;
+        default:
+            this->currentAIType = cfg.enableAI ? AIType::NVIDIA_RTX : AIType::NONE;
+            break;
+        }
     } else {
         this->deviceIndex = deviceIndex;
         this->forceMjpg = true;
@@ -140,7 +165,7 @@ void Application::updateMenuChecks() {
 
     // Devices
     for (size_t i = 0; i < devices.size(); i++) {
-        CheckMenuItem(g_hMenu, IDM_DEVICE_0 + i, MF_BYCOMMAND | (deviceIndex == (int)i ? MF_CHECKED : MF_UNCHECKED));
+        CheckMenuItem(g_hMenu, static_cast<UINT>(IDM_DEVICE_0 + i), MF_BYCOMMAND | (deviceIndex == (int)i ? MF_CHECKED : MF_UNCHECKED));
     }
 
     // Input
@@ -180,9 +205,15 @@ void Application::handleWin32Command(int menuId) {
     else if (menuId == IDM_MJPG_TOGGLE) { forceMjpg = !forceMjpg; pendingCaptureRestart = true; }
     // 3. IA Denoise
     else if (menuId == IDM_DENOISE_TOGGLE) {
-        if (!enableDenoise) { pendingDenoiseInit = true; } else { enableDenoise = false; }
+        if (!enableDenoise) {
+            pendingDenoiseInit = true;
+        } else {
+            enableDenoise = false;
+            pendingDenoiseInit = false;
+            videoProcessor.releaseDenoiser();
+        }
     }
-    else if (menuId == IDM_DENOISE_00) { denoiseStrength = 0.0f; enableDenoise = false; videoProcessor.releaseDenoiser(); pendingDenoiseInit = true; }
+    else if (menuId == IDM_DENOISE_00) { denoiseStrength = 0.0f; enableDenoise = false; pendingDenoiseInit = false; videoProcessor.releaseDenoiser(); }
     else if (menuId == IDM_DENOISE_05) { denoiseStrength = 0.5f; enableDenoise = false; videoProcessor.releaseDenoiser(); pendingDenoiseInit = true; }
     else if (menuId == IDM_DENOISE_10) { denoiseStrength = 1.0f; enableDenoise = false; videoProcessor.releaseDenoiser(); pendingDenoiseInit = true; }
     // 4. AA & SR
@@ -202,11 +233,14 @@ void Application::handleWin32Command(int menuId) {
     else if (menuId == IDM_SAVE_CONFIG) {
         AppConfig cfg;
         cfg.deviceIndex = deviceIndex;
+        cfg.deviceHwIndex = (deviceIndex >= 0 && deviceIndex < (int)devices.size()) ? devices[deviceIndex].hwIndex : -1;
         cfg.capWidth = capWidth;
         cfg.capHeight = capHeight;
         cfg.capFps = capFps;
         cfg.srWidth = srWidth;
         cfg.srHeight = srHeight;
+        cfg.denoiseStrength = denoiseStrength;
+        cfg.aiType = static_cast<int>(currentAIType);
         cfg.enableDenoise = enableDenoise;
         cfg.enableAI = (currentAIType != AIType::NONE);
         cfg.enableAA = enableAA;
@@ -241,7 +275,7 @@ void Application::run() {
             std::string devName = devices[deviceIndex].name;
             std::wstring wideTitle = L"Gnocchi's Viewer - " + std::wstring(devName.begin(), devName.end());
             SetWindowTextW(g_hwnd, wideTitle.c_str());
-            audioManager.start();
+            audioManager.start(devName);
             if (currentAIType != AIType::NONE) pendingAIInit = true;
             if (enableDenoise) pendingDenoiseInit = true;
         }
@@ -266,7 +300,7 @@ void Application::run() {
                     std::string devName = devices[deviceIndex].name;
                     std::wstring wideTitle = L"Gnocchi's Viewer - " + std::wstring(devName.begin(), devName.end());
                     SetWindowTextW(g_hwnd, wideTitle.c_str());
-                    audioManager.start();
+                    audioManager.start(devName);
                     if (oldAI != AIType::NONE) pendingAIInit = true;
                     if (oldDenoise) pendingDenoiseInit = true;
                 }
@@ -329,7 +363,8 @@ void Application::run() {
         if (pendingScreenshot) {
             CreateDirectoryA("capturas", NULL);
             auto t = std::time(nullptr);
-            auto tm = *std::localtime(&t);
+            std::tm tm = {};
+            localtime_s(&tm, &t);
             char buf[64];
             std::strftime(buf, sizeof(buf), "capturas\\captura_%Y%m%d_%H%M%S.png", &tm);
             cv::imwrite(buf, displayFrame);
@@ -354,7 +389,7 @@ void Application::run() {
         }
 
         appWindow.show(displayFrame);
-        handleInput(captureActive);
+        handleInput();
         
         // Manejo del aspa [X] de Win32 en vez de solo presionar ESC
         if (cv::getWindowProperty(appWindow.getName(), cv::WND_PROP_VISIBLE) < 1) {
@@ -371,11 +406,9 @@ void Application::run() {
     std::cout << "Recursos liberados. Programa terminado." << std::endl;
 }
 
-void Application::handleInput(bool& captureActive) {
+void Application::handleInput() {
     char key = (char)cv::waitKey(1); 
     if (key == 27) { appWindow.toggleFullscreen(); }
     else if (key == 'm' || key == 'M') { /* Desactivado el overlay transparente */ }
     else if (key == 'q' || key == 'Q') { isRunning = false; }
 }
-
-

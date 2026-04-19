@@ -1,85 +1,84 @@
-# 🍝 Gnocchi's Viewer
-### *El visor de capturadoras definitivo impulsado por Inteligencia Artificial*
+# Gnocchi's Viewer
 
-**Gnocchi's Viewer** es un software de alto rendimiento desarrollado en C++ diseñado para transformar capturadoras de video económicas (USB 2.0 y 3.0) en dispositivos de visualización de grado profesional. Utilizando la potencia de los **Tensor Cores de NVIDIA** y modelos neurales universales, elimina el ruido, escala la imagen y reduce la latencia a niveles imperceptibles.
+Visor de capturadoras en C++ para Windows con enfoque en baja latencia, limpieza de artefactos y escalado por IA.
 
----
+## Que hace
 
-## 🚀 Guía de Inicio Rápido
+- Captura video por `OpenCV + MSMF`.
+- Prioriza un flujo de baja latencia sin colas ni buffering extra.
+- Puede aplicar limpieza de artefactos con NVIDIA Video Effects.
+- Puede escalar con `NVIDIA RTX VSR` o con `FSRCNN` como alternativa universal.
+- Incluye puente de audio directo por `miniaudio`.
+- Usa una ventana OpenCV con menu nativo Win32, sin frameworks GUI pesados.
 
-### 1. Descarga y Preparación
-Simplemente descarga la **última versión (Latest Release)** de la aplicación desde el repositorio. 
-> [!NOTE]
-> No necesitas instalar dependencias externas; todos los núcleos de NVIDIA, modelos de IA y librerías de procesamiento vienen pre-instalados dentro de la carpeta del programa.
+## Flujo principal
 
-### 2. Paciencia al Iniciar
-Al abrir el programa, verás que tarda unos segundos en mostrar la imagen. **Esto es normal**. El software está realizando un escaneo profundo de todos tus dispositivos de video y audio para garantizar la mejor sincronización posible. Una vez detectada la interfaz, el programa funcionará de forma fluida.
+1. Ingesta desde la capturadora por `CAP_MSMF`.
+2. Frame en RAM.
+3. Procesamiento opcional:
+   - `NVIDIA Denoise`
+   - `NVIDIA RTX VSR`
+   - `FSRCNN`
+   - `Lanczos 4`
+4. Presentacion inmediata en ventana.
 
----
+Cuando se usa `Denoise + RTX VSR`, el proyecto mantiene el encadenamiento entre filtros en VRAM antes de bajar el frame final para mostrarlo.
 
-## 🍱 Comparativa de Calidad (IA)
+## Controles y menu
 
-A continuación se muestra la efectividad del motor **NVIDIA RTX Artifact Reduction** integrado en el visor:
+- `ESC`: alterna Zen Mode / fullscreen.
+- `Q`: cierra la aplicacion.
+- `Dispositivo`: selecciona la capturadora.
+- `Ingesta (USB)`: cambia resolucion, FPS y MJPEG.
+- `Procesamiento IA`: activa Denoise, FSRCNN, RTX VSR y resolucion objetivo.
+- `Herramientas`: toma capturas de pantalla.
+- `Opciones > Guardar Configuracion`: guarda el estado actual en `config.ini`.
 
-| Sin Procesar (Solo MJPEG) | Con NVIDIA Denoise ACTIVO |
-| :---: | :---: |
-| ![Original](capturas/captura_20260417_163817.png) | ![Denoise Activo](capturas/captura_20260417_163616.png) |
+## Requisitos
 
-### Más resultados con Denoise (Filtro Alto):
-![Detalle 1](capturas/captura_20260417_165021.png)
-![Detalle 2](capturas/captura_20260417_165039.png)
+- Windows.
+- Visual Studio Build Tools o Visual Studio con toolchain C++.
+- CMake.
+- vcpkg.
+- CUDA Toolkit.
+- Drivers NVIDIA compatibles para usar los filtros RTX.
+- Carpeta `NVIDIA Video Effects` presente en la raiz del proyecto.
 
----
+## Estructura esperada del SDK NVIDIA
 
-## 🛠️ Cómo Utilizar el Programa
+El proyecto espera esta raiz:
 
-Para obtener la mejor experiencia, sigue este orden de configuración:
+```text
+G:\dev\Capturadora\NVIDIA Video Effects
+```
 
-### A. Selección de Dispositivo
-Dirígete al menú **"Dispositivo"** en la parte superior y selecciona la capturadora que deseas utilizar. El programa se reiniciará automáticamente para conectar el motor de latencia ultra-baja al hardware seleccionado.
+Y usa estas rutas en tiempo de ejecucion:
 
-### B. Configuración de Ingesta (USB)
-En el menú **"Ingesta (USB)"**, puedes ajustar cómo el programa recibe los datos de la capturadora:
-- **Resolución**: Elige entre 1080p o 720p según la capacidad de tu hardware.
-- **Frame Rate**: Cambia entre 60 FPS o 30 FPS.
-- **Forzar Ingesta MJPEG**: 
-    - **Si tienes USB 3.0**: Recomendamos **desmarcar** esta opción para usar formatos sin compresión (RAW) y obtener la máxima fidelidad.
-    - **Si tienes USB 2.0**: Mantén esta opción **marcada** (el check activo) para asegurar una visualización fluida de 60 FPS dentro de los límites de ancho de banda.
+```text
+NVIDIA Video Effects\bin
+NVIDIA Video Effects\features\nvvfxvideosuperres\bin
+NVIDIA Video Effects\models
+```
 
-### C. Procesamiento IA (Inteligencia Artificial)
-Este es el corazón de **Gnocchi's Viewer**. En el menú **"Procesamiento IA"** encontrarás:
+## Notas de arquitectura
 
-1. **NVIDIA Denoise**: 
-    - Selecciona el nivel (Bajo o Alto) y haz clic en **"Activar Denoise"**.
-    - Utiliza tecnología de NVIDIA para limpiar el ruido y los "artefactos" de compresión de las capturadoras baratas, dejando una imagen cristalina.
-2. **AA Lanczos 4**: Un filtro de anti-aliasing matemático de alta calidad para suavizar bordes.
-3. **Super Resolución**:
-    - **Resolución Destino**: Elige si quieres ver tu juego en 1080p, 1440p o **4K**.
-    - **NVIDIA RTX VSR**: Si tienes una tarjeta NVIDIA RTX (serie 30 o superior), esta opción usará los Tensor Cores para reescalar el video con calidad cinematográfica.
-    - **Universal FSRCNN**: Si no tienes una tarjeta NVIDIA RTX, esta red neuronal universal procesará la imagen mediante CPU/OpenCL para mejorar la definición.
+- No introducir buffering adicional en video o audio.
+- `GPUUpscaler` trabaja sobre buffers RGBA.
+- `GPUDenoiser` trabaja dentro del flujo NVIDIA VFX esperado por el proyecto.
+- No remover la manipulacion dinamica de `PATH` en los modulos NVIDIA.
+- Toda reserva GPU debe liberar sus recursos en `release()`.
 
-### D. Guardar Configuración
-No pierdas tiempo configurando todo cada vez que abras el programa. 
-- Ve a **"Opciones" > "Guardar Configuración"**. 
-- El software recordará tu dispositivo, tus filtros de IA y tus ajustes de ingesta para que siempre inicie exactamente como a ti te gusta.
+## Estado actual
 
----
+- Persistencia de configuracion funcionando.
+- Seleccion de dispositivo de video restaurable.
+- FSRCNN ajustado para respetar la resolucion objetivo final.
+- Emparejamiento de audio mejorado usando el nombre real de la capturadora cuando esta disponible.
 
-## 📸 Herramientas y Atajos
+## Capturas
 
-- **F11 / ESC**: Activa el **Zen Mode** (Pantalla completa sin bordes y oculta automáticamente los menús para una inmersión total).
-- **Captura de Pantalla**: En el menú **"Herramientas"**, puedes tomar un screenshot instantáneo de lo que estás viendo. Las capturas se guardan en la carpeta `/capturas`.
+Las capturas se guardan en:
 
----
-
-## 🧠 Especificaciones Técnicas (Para Developers)
-
-- **Zero-Buffer Logic**: Pipeline de video modificado para inyectar frames directamente desde el hardware a VRAM, logrando una latencia <10ms.
-- **NVIDIA Video Effects SDK**: Integración nativa para Artifact Reduction y Super Resolution.
-- **OpenCV DNN**: Motor de inferencia para modelos FSRCNN (.pb) universales.
-- **C++ 17 & Win32 API**: Interfaz de usuario de bajo nivel para evitar el overhead de frameworks pesados.
-
----
-
-> [!IMPORTANT]
-> **Hecho por y para gamers**. Este visor está diseñado para que jugar a través de una capturadora se sienta tan natural como si estuvieras conectado directamente al monitor.
+```text
+G:\dev\Capturadora\capturas
+```

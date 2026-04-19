@@ -54,12 +54,14 @@ set(SOURCES
 # Ejecutable
 add_executable(AILinkCapture ${SOURCES})
 set_target_properties(AILinkCapture PROPERTIES OUTPUT_NAME "Gnocchi's Viewer")
+target_compile_definitions(AILinkCapture PRIVATE CAPTURADORA_PROJECT_DIR="${CMAKE_SOURCE_DIR}")
 
 # Conectar OpenCV
 target_link_libraries(AILinkCapture PRIVATE ${OpenCV_LIBS})
 
 # Conectar CUDA Runtime (para cudaMalloc/cudaFree en GPUDenoiser)
 target_link_libraries(AILinkCapture PRIVATE CUDA::cudart)
+target_link_libraries(AILinkCapture PRIVATE Mfplat Mf Mfuuid Ole32)
 
 # Librerias nativas de Windows
 if(MSVC)
@@ -103,4 +105,3 @@ add_custom_command(TARGET AILinkCapture POST_BUILD
         "$<TARGET_FILE_DIR:AILinkCapture>"
     COMMENT "Empaquetando dependencias de OpenCV (DLLs)..."
 )
-

@@ -12,15 +12,7 @@ extern char* g_nvVFXSDKPath;
 
 static std::string getProjectDir() {
 #ifdef _WIN32
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(NULL, exePath, MAX_PATH);
-    std::string exeDir(exePath);
-    size_t lastSlash = exeDir.find_last_of("\\/");
-    exeDir = exeDir.substr(0, lastSlash);
-    size_t s1 = exeDir.find_last_of("\\/");
-    std::string buildDir = exeDir.substr(0, s1);
-    s1 = buildDir.find_last_of("\\/");
-    return buildDir.substr(0, s1);
+    return CAPTURADORA_PROJECT_DIR;
 #else
     return "";
 #endif
