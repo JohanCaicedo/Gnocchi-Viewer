@@ -39,6 +39,47 @@ bool OpenCVUpscaler::processFrame(const cv::Mat& inFrame, cv::Mat& outFrame) {
     }
 }
 
+bool OpenCVUpscaler::processSpatialFrame(const cv::Mat& inFrame, cv::Mat& outFrame, cv::Size targetSize, SpatialScalerType spatialType) {
+    if (inFrame.empty() || targetSize.width <= 0 || targetSize.height <= 0) {
+        return false;
+    }
+
+    try {
+        cv::resize(inFrame, outFrame, targetSize, 0.0, 0.0, getInterpolation(spatialType));
+        if (spatialType == SpatialScalerType::SHARP_BILINEAR) {
+            applyLightSharpen(outFrame);
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 void OpenCVUpscaler::release() {
     isLoaded = false;
+}
+
+int OpenCVUpscaler::getInterpolation(SpatialScalerType spatialType) {
+    switch (spatialType) {
+    case SpatialScalerType::NEAREST:
+        return cv::INTER_NEAREST;
+    case SpatialScalerType::BILINEAR:
+    case SpatialScalerType::SHARP_BILINEAR:
+        return cv::INTER_LINEAR;
+    case SpatialScalerType::BICUBIC:
+        return cv::INTER_CUBIC;
+    case SpatialScalerType::LANCZOS4:
+    default:
+        return cv::INTER_LANCZOS4;
+    }
+}
+
+void OpenCVUpscaler::applyLightSharpen(cv::Mat& frame) {
+    cv::Mat sharpened;
+    static const cv::Mat kernel = (cv::Mat_<float>(3, 3) <<
+        0.0f, -0.5f, 0.0f,
+        -0.5f, 3.0f, -0.5f,
+        0.0f, -0.5f, 0.0f);
+    cv::filter2D(frame, sharpened, -1, kernel);
+    sharpened.copyTo(frame);
 }

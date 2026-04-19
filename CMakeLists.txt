@@ -22,6 +22,7 @@ find_package(CUDAToolkit REQUIRED)
 # NVIDIA VFX SDK (Video Effects / Super Resolution)
 # ============================================================
 set(VFXSDK_ROOT "${CMAKE_SOURCE_DIR}/NVIDIA Video Effects")
+set(OPTICAL_FLOW_SDK_ROOT "${CMAKE_SOURCE_DIR}/third_party/NVIDIA Optical Flow SDK")
 
 # Carpetas de cabeceras
 include_directories(include)
@@ -32,6 +33,8 @@ include_directories("${VFXSDK_ROOT}/features/nvvfxvideosuperres/include")
 include_directories("${VFXSDK_ROOT}/features/nvvfxdenoising/include")
 # Utilidades del SDK (nvCVOpenCV.h)
 include_directories("${CMAKE_SOURCE_DIR}/../VFX-SDK-Samples/utils")
+include_directories("${OPTICAL_FLOW_SDK_ROOT}/NvOFFRUC/Interface")
+include_directories("${OPTICAL_FLOW_SDK_ROOT}/NvOFInterface")
 
 # Archivos fuente de la aplicacion
 set(SOURCES
@@ -40,6 +43,7 @@ set(SOURCES
     src/VideoProcessor.cpp
     src/AppWindow.cpp
     src/Application.cpp
+    src/GPUFrameGenerator.cpp
     src/GPUUpscaler.cpp
     src/GPUDenoiser.cpp
     src/OpenCVUpscaler.cpp
@@ -55,13 +59,14 @@ set(SOURCES
 add_executable(AILinkCapture ${SOURCES})
 set_target_properties(AILinkCapture PROPERTIES OUTPUT_NAME "Gnocchi's Viewer")
 target_compile_definitions(AILinkCapture PRIVATE CAPTURADORA_PROJECT_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(AILinkCapture PRIVATE CAPTURADORA_OPTICAL_FLOW_SDK_DIR="${OPTICAL_FLOW_SDK_ROOT}")
 
 # Conectar OpenCV
 target_link_libraries(AILinkCapture PRIVATE ${OpenCV_LIBS})
 
 # Conectar CUDA Runtime (para cudaMalloc/cudaFree en GPUDenoiser)
 target_link_libraries(AILinkCapture PRIVATE CUDA::cudart)
-target_link_libraries(AILinkCapture PRIVATE Mfplat Mf Mfuuid Ole32)
+target_link_libraries(AILinkCapture PRIVATE Mfplat Mf Mfuuid Mfreadwrite Ole32)
 
 # Librerias nativas de Windows
 if(MSVC)
@@ -105,3 +110,21 @@ add_custom_command(TARGET AILinkCapture POST_BUILD
         "$<TARGET_FILE_DIR:AILinkCapture>"
     COMMENT "Empaquetando dependencias de OpenCV (DLLs)..."
 )
+
+if(EXISTS "${OPTICAL_FLOW_SDK_ROOT}/NvOFFRUC/NvOFFRUCSample/bin/win64/NvOFFRUC.dll")
+    add_custom_command(TARGET AILinkCapture POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${OPTICAL_FLOW_SDK_ROOT}/NvOFFRUC/NvOFFRUCSample/bin/win64/NvOFFRUC.dll"
+            "$<TARGET_FILE_DIR:AILinkCapture>/NvOFFRUC.dll"
+        COMMENT "Empaquetando NVIDIA Optical Flow FRUC runtime..."
+    )
+endif()
+
+if(EXISTS "${OPTICAL_FLOW_SDK_ROOT}/NvOFFRUC/NvOFFRUCSample/bin/win64/cudart64_110.dll")
+    add_custom_command(TARGET AILinkCapture POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${OPTICAL_FLOW_SDK_ROOT}/NvOFFRUC/NvOFFRUCSample/bin/win64/cudart64_110.dll"
+            "$<TARGET_FILE_DIR:AILinkCapture>/cudart64_110.dll"
+        COMMENT "Empaquetando runtime CUDA requerido por FRUC..."
+    )
+endif()

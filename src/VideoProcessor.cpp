@@ -30,6 +30,8 @@ bool VideoProcessor::initUpscaler(int srcW, int srcH, int dstW, int dstH, AIType
 
         fsrcnnEnabled = cvUpscaler.initialize(absoluteModelPath, scale);
         return fsrcnnEnabled;
+    } else if (isSpatialType(type)) {
+        return true;
     }
     return false;
 }
@@ -103,6 +105,18 @@ void VideoProcessor::processFrame(const cv::Mat& inputFrame, cv::Mat& outputFram
         return;
     }
 
+    // Escaladores espaciales ligeros
+    if (isSpatialType(upscalerType)) {
+        const cv::Mat& spatialInput = (enableDenoise && denoiser.denoise(inputFrame, denoiseInternalOutput))
+            ? denoiseInternalOutput
+            : inputFrame;
+
+        if (!cvUpscaler.processSpatialFrame(spatialInput, outputFrame, cv::Size(upOutW, upOutH), toSpatialScalerType(upscalerType))) {
+            cv::resize(spatialInput, outputFrame, cv::Size(upOutW, upOutH), 0, 0, cv::INTER_LANCZOS4);
+        }
+        return;
+    }
+
     inputFrame.copyTo(outputFrame);
 }
 
@@ -122,4 +136,45 @@ void VideoProcessor::releaseUpscaler() {
 
 void VideoProcessor::releaseDenoiser() {
     denoiser.release();
+}
+
+bool VideoProcessor::initFrameGenerator(int width, int height) {
+    return frameGenerator.initialize(width, height);
+}
+
+void VideoProcessor::releaseFrameGenerator() {
+    frameGenerator.release();
+}
+
+bool VideoProcessor::isFrameGeneratorReady() const {
+    return frameGenerator.isReady();
+}
+
+bool VideoProcessor::isSpatialType(AIType type) {
+    switch (type) {
+    case AIType::SPATIAL_NEAREST:
+    case AIType::SPATIAL_BILINEAR:
+    case AIType::SPATIAL_BICUBIC:
+    case AIType::SPATIAL_LANCZOS4:
+    case AIType::SPATIAL_SHARP_BILINEAR:
+        return true;
+    default:
+        return false;
+    }
+}
+
+SpatialScalerType VideoProcessor::toSpatialScalerType(AIType type) {
+    switch (type) {
+    case AIType::SPATIAL_NEAREST:
+        return SpatialScalerType::NEAREST;
+    case AIType::SPATIAL_BILINEAR:
+        return SpatialScalerType::BILINEAR;
+    case AIType::SPATIAL_BICUBIC:
+        return SpatialScalerType::BICUBIC;
+    case AIType::SPATIAL_SHARP_BILINEAR:
+        return SpatialScalerType::SHARP_BILINEAR;
+    case AIType::SPATIAL_LANCZOS4:
+    default:
+        return SpatialScalerType::LANCZOS4;
+    }
 }

@@ -10,3 +10,4 @@ vcpkg_installed/
 *.exe
 *.dll
 *.lib
+third_party/
