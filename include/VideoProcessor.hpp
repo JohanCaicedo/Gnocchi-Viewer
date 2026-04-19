@@ -1,5 +1,6 @@
 #pragma once
 #include <opencv2/opencv.hpp>
+#include "Anime4KUpscaler.hpp"
 #include "GPUDenoiser.hpp"
 #include "GPUFrameGenerator.hpp"
 #include "GPUUpscaler.hpp"
@@ -13,7 +14,8 @@ enum class AIType {
     SPATIAL_BILINEAR = 4,
     SPATIAL_BICUBIC = 5,
     SPATIAL_LANCZOS4 = 6,
-    SPATIAL_SHARP_BILINEAR = 7
+    SPATIAL_SHARP_BILINEAR = 7,
+    ANIME4K = 8
 };
 
 class VideoProcessor {
@@ -54,6 +56,7 @@ private:
     GPUUpscaler upscaler;
     GPUDenoiser denoiser;
     GPUFrameGenerator frameGenerator;
+    Anime4KUpscaler anime4kUpscaler;
     OpenCVUpscaler cvUpscaler;
     
     cv::Mat denoiseInternalOutput;

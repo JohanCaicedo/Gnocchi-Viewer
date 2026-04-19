@@ -23,6 +23,27 @@ find_package(CUDAToolkit REQUIRED)
 # ============================================================
 set(VFXSDK_ROOT "${CMAKE_SOURCE_DIR}/NVIDIA Video Effects")
 set(OPTICAL_FLOW_SDK_ROOT "${CMAKE_SOURCE_DIR}/third_party/NVIDIA Optical Flow SDK")
+set(ANIME4KCPP_ROOT "${CMAKE_SOURCE_DIR}/third_party/Anime4KCPP")
+
+# ============================================================
+# Anime4KCPP (core only, sin modulo de video)
+# ============================================================
+set(AC_BUILD_CLI OFF CACHE BOOL "" FORCE)
+set(AC_BUILD_GUI OFF CACHE BOOL "" FORCE)
+set(AC_BUILD_VIDEO OFF CACHE BOOL "" FORCE)
+set(AC_BUILD_FILTER_AVISYNTH OFF CACHE BOOL "" FORCE)
+set(AC_BUILD_FILTER_VAPOURSYNTH OFF CACHE BOOL "" FORCE)
+set(AC_BUILD_FILTER_DIRECTSHOW OFF CACHE BOOL "" FORCE)
+set(AC_BUILD_FILTER_AVISYNTH_VAPOURSYNTH OFF CACHE BOOL "" FORCE)
+set(AC_BUILD_BINDING_C OFF CACHE BOOL "" FORCE)
+set(AC_BUILD_BINDING_PYTHON OFF CACHE BOOL "" FORCE)
+set(AC_TOOLS_BENCHMARK OFF CACHE BOOL "" FORCE)
+set(AC_TEST_UTIL OFF CACHE BOOL "" FORCE)
+set(AC_TEST_VIDEO OFF CACHE BOOL "" FORCE)
+set(AC_CORE_DISABLE_IMAGE_IO ON CACHE BOOL "" FORCE)
+set(AC_CORE_WITH_CUDA OFF CACHE BOOL "" FORCE)
+set(AC_CORE_WITH_OPENCL OFF CACHE BOOL "" FORCE)
+add_subdirectory("${ANIME4KCPP_ROOT}" "${CMAKE_BINARY_DIR}/third_party/anime4kcpp")
 
 # Carpetas de cabeceras
 include_directories(include)
@@ -43,6 +64,7 @@ set(SOURCES
     src/VideoProcessor.cpp
     src/AppWindow.cpp
     src/Application.cpp
+    src/Anime4KUpscaler.cpp
     src/GPUFrameGenerator.cpp
     src/GPUUpscaler.cpp
     src/GPUDenoiser.cpp
@@ -63,6 +85,7 @@ target_compile_definitions(AILinkCapture PRIVATE CAPTURADORA_OPTICAL_FLOW_SDK_DI
 
 # Conectar OpenCV
 target_link_libraries(AILinkCapture PRIVATE ${OpenCV_LIBS})
+target_link_libraries(AILinkCapture PRIVATE AC::Core)
 
 # Conectar CUDA Runtime (para cudaMalloc/cudaFree en GPUDenoiser)
 target_link_libraries(AILinkCapture PRIVATE CUDA::cudart)

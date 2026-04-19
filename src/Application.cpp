@@ -13,6 +13,21 @@ WNDPROC g_oldWndProc = nullptr;
 HWND g_hwnd = nullptr;
 HMENU g_hMenu = nullptr;
 
+const char* getRTXQualityMenuLabel(int quality) {
+    switch (quality) {
+    case GPUUpscaler::kModeVsrBicubic: return "RTX Bicubic";
+    case GPUUpscaler::kModeVsrLow: return "RTX VSR Low";
+    case GPUUpscaler::kModeVsrMedium: return "RTX VSR Medium";
+    case GPUUpscaler::kModeVsrHigh: return "RTX VSR High";
+    case GPUUpscaler::kModeVsrUltra: return "RTX VSR Ultra";
+    case GPUUpscaler::kModeHighBitrateLow: return "RTX HighBitrate Low";
+    case GPUUpscaler::kModeHighBitrateMedium: return "RTX HighBitrate Medium";
+    case GPUUpscaler::kModeHighBitrateHigh: return "RTX HighBitrate High";
+    case GPUUpscaler::kModeHighBitrateUltra: return "RTX HighBitrate Ultra";
+    default: return "RTX VSR Ultra";
+    }
+}
+
 std::wstring toWide(const std::string& value) {
     if (value.empty()) return {};
     int required = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
@@ -49,6 +64,7 @@ Application::Application(int deviceIndex)
         srWidth = cfg.srWidth;
         srHeight = cfg.srHeight;
         denoiseStrength = cfg.denoiseStrength;
+        rtxQuality = cfg.rtxQuality;
         enableDenoise = cfg.enableDenoise;
         enableFrameGeneration = cfg.enableFrameGeneration;
         showFpsViewer = cfg.showFpsViewer;
@@ -76,6 +92,7 @@ Application::Application(int deviceIndex)
         case static_cast<int>(AIType::SPATIAL_BICUBIC): currentAIType = AIType::SPATIAL_BICUBIC; break;
         case static_cast<int>(AIType::SPATIAL_LANCZOS4): currentAIType = AIType::SPATIAL_LANCZOS4; break;
         case static_cast<int>(AIType::SPATIAL_SHARP_BILINEAR): currentAIType = AIType::SPATIAL_SHARP_BILINEAR; break;
+        case static_cast<int>(AIType::ANIME4K): currentAIType = AIType::ANIME4K; break;
         default: currentAIType = cfg.enableAI ? AIType::NVIDIA_RTX : AIType::NONE; break;
         }
     }
@@ -165,6 +182,10 @@ void Application::updateWindowTitle() {
     title += toWide(std::to_string(capFps));
     title += L" FPS | ";
     title += toWide(CaptureManager::pixelFormatToString(activeFormat));
+    if (currentAIType == AIType::NVIDIA_RTX) {
+        title += L" | ";
+        title += toWide(getRTXQualityMenuLabel(rtxQuality));
+    }
 
     SetWindowTextW(g_hwnd, title.c_str());
 }
@@ -218,11 +239,25 @@ void Application::setupNativeMenu() {
     AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_RTX_TOGGLE, "Activar IA: NVIDIA RTX VSR");
     AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_FSRCNN_TOGGLE, "Activar IA: Universal FSRCNN");
     AppendMenuA(hMenuUpscaling, MF_SEPARATOR, 0, nullptr);
+    HMENU hMenuRTXModes = CreatePopupMenu();
+    AppendMenuA(hMenuRTXModes, MF_STRING, IDM_RTX_QUALITY_BICUBIC, "RTX Bicubic");
+    AppendMenuA(hMenuRTXModes, MF_STRING, IDM_RTX_QUALITY_LOW, "RTX VSR Low");
+    AppendMenuA(hMenuRTXModes, MF_STRING, IDM_RTX_QUALITY_MEDIUM, "RTX VSR Medium");
+    AppendMenuA(hMenuRTXModes, MF_STRING, IDM_RTX_QUALITY_HIGH, "RTX VSR High");
+    AppendMenuA(hMenuRTXModes, MF_STRING, IDM_RTX_QUALITY_ULTRA, "RTX VSR Ultra");
+    AppendMenuA(hMenuRTXModes, MF_SEPARATOR, 0, nullptr);
+    AppendMenuA(hMenuRTXModes, MF_STRING, IDM_RTX_QUALITY_HB_LOW, "RTX HighBitrate Low");
+    AppendMenuA(hMenuRTXModes, MF_STRING, IDM_RTX_QUALITY_HB_MEDIUM, "RTX HighBitrate Medium");
+    AppendMenuA(hMenuRTXModes, MF_STRING, IDM_RTX_QUALITY_HB_HIGH, "RTX HighBitrate High");
+    AppendMenuA(hMenuRTXModes, MF_STRING, IDM_RTX_QUALITY_HB_ULTRA, "RTX HighBitrate Ultra");
+    AppendMenuA(hMenuUpscaling, MF_POPUP, (UINT_PTR)hMenuRTXModes, "Modos RTX GPU");
+    AppendMenuA(hMenuUpscaling, MF_SEPARATOR, 0, nullptr);
     AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_SPATIAL_NEAREST, "Escalado espacial: Nearest");
     AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_SPATIAL_BILINEAR, "Escalado espacial: Bilinear");
     AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_SPATIAL_BICUBIC, "Escalado espacial: Bicubic");
     AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_SPATIAL_LANCZOS4, "Escalado espacial: Lanczos 4");
     AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_SPATIAL_SHARP_BILINEAR, "Escalado espacial: Sharpened Bilinear");
+    AppendMenuA(hMenuUpscaling, MF_STRING, IDM_AI_ANIME4K_TOGGLE, "Anime4K");
     AppendMenuA(hMenuUpscaling, MF_SEPARATOR, 0, nullptr);
     AppendMenuA(hMenuUpscaling, MF_STRING, IDM_TARGET_1080, "Resolucion destino: 1080p");
     AppendMenuA(hMenuUpscaling, MF_STRING, IDM_TARGET_1440, "Resolucion destino: 1440p");
@@ -269,12 +304,22 @@ void Application::updateMenuChecks() {
     CheckMenuItem(g_hMenu, IDM_DENOISE_10, MF_BYCOMMAND | (denoiseStrength == 1.0f ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_FRAMEGEN_TOGGLE, MF_BYCOMMAND | (enableFrameGeneration ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_AI_RTX_TOGGLE, MF_BYCOMMAND | (currentAIType == AIType::NVIDIA_RTX ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_RTX_QUALITY_BICUBIC, MF_BYCOMMAND | (rtxQuality == GPUUpscaler::kModeVsrBicubic ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_RTX_QUALITY_LOW, MF_BYCOMMAND | (rtxQuality == GPUUpscaler::kModeVsrLow ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_RTX_QUALITY_MEDIUM, MF_BYCOMMAND | (rtxQuality == GPUUpscaler::kModeVsrMedium ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_RTX_QUALITY_HIGH, MF_BYCOMMAND | (rtxQuality == GPUUpscaler::kModeVsrHigh ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_RTX_QUALITY_ULTRA, MF_BYCOMMAND | (rtxQuality == GPUUpscaler::kModeVsrUltra ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_RTX_QUALITY_HB_LOW, MF_BYCOMMAND | (rtxQuality == GPUUpscaler::kModeHighBitrateLow ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_RTX_QUALITY_HB_MEDIUM, MF_BYCOMMAND | (rtxQuality == GPUUpscaler::kModeHighBitrateMedium ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_RTX_QUALITY_HB_HIGH, MF_BYCOMMAND | (rtxQuality == GPUUpscaler::kModeHighBitrateHigh ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_RTX_QUALITY_HB_ULTRA, MF_BYCOMMAND | (rtxQuality == GPUUpscaler::kModeHighBitrateUltra ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_AI_FSRCNN_TOGGLE, MF_BYCOMMAND | (currentAIType == AIType::OPENCV_FSRCNN ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_AI_SPATIAL_NEAREST, MF_BYCOMMAND | (currentAIType == AIType::SPATIAL_NEAREST ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_AI_SPATIAL_BILINEAR, MF_BYCOMMAND | (currentAIType == AIType::SPATIAL_BILINEAR ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_AI_SPATIAL_BICUBIC, MF_BYCOMMAND | (currentAIType == AIType::SPATIAL_BICUBIC ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_AI_SPATIAL_LANCZOS4, MF_BYCOMMAND | (currentAIType == AIType::SPATIAL_LANCZOS4 ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_AI_SPATIAL_SHARP_BILINEAR, MF_BYCOMMAND | (currentAIType == AIType::SPATIAL_SHARP_BILINEAR ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(g_hMenu, IDM_AI_ANIME4K_TOGGLE, MF_BYCOMMAND | (currentAIType == AIType::ANIME4K ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_AA_TOGGLE, MF_BYCOMMAND | (enableAA ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_TARGET_1080, MF_BYCOMMAND | (srWidth == 1920 ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(g_hMenu, IDM_TARGET_1440, MF_BYCOMMAND | (srWidth == 2560 ? MF_CHECKED : MF_UNCHECKED));
@@ -339,6 +384,24 @@ void Application::handleWin32Command(int menuId) {
     } else if (menuId == IDM_AI_RTX_TOGGLE) {
         if (currentAIType != AIType::NVIDIA_RTX) { currentAIType = AIType::NVIDIA_RTX; pendingAIInit = true; }
         else { currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
+    } else if (menuId == IDM_RTX_QUALITY_BICUBIC) {
+        rtxQuality = GPUUpscaler::kModeVsrBicubic; scheduleRTXReinitIfActive();
+    } else if (menuId == IDM_RTX_QUALITY_LOW) {
+        rtxQuality = GPUUpscaler::kModeVsrLow; scheduleRTXReinitIfActive();
+    } else if (menuId == IDM_RTX_QUALITY_MEDIUM) {
+        rtxQuality = GPUUpscaler::kModeVsrMedium; scheduleRTXReinitIfActive();
+    } else if (menuId == IDM_RTX_QUALITY_HIGH) {
+        rtxQuality = GPUUpscaler::kModeVsrHigh; scheduleRTXReinitIfActive();
+    } else if (menuId == IDM_RTX_QUALITY_ULTRA) {
+        rtxQuality = GPUUpscaler::kModeVsrUltra; scheduleRTXReinitIfActive();
+    } else if (menuId == IDM_RTX_QUALITY_HB_LOW) {
+        rtxQuality = GPUUpscaler::kModeHighBitrateLow; scheduleRTXReinitIfActive();
+    } else if (menuId == IDM_RTX_QUALITY_HB_MEDIUM) {
+        rtxQuality = GPUUpscaler::kModeHighBitrateMedium; scheduleRTXReinitIfActive();
+    } else if (menuId == IDM_RTX_QUALITY_HB_HIGH) {
+        rtxQuality = GPUUpscaler::kModeHighBitrateHigh; scheduleRTXReinitIfActive();
+    } else if (menuId == IDM_RTX_QUALITY_HB_ULTRA) {
+        rtxQuality = GPUUpscaler::kModeHighBitrateUltra; scheduleRTXReinitIfActive();
     } else if (menuId == IDM_AI_FSRCNN_TOGGLE) {
         if (currentAIType != AIType::OPENCV_FSRCNN) { currentAIType = AIType::OPENCV_FSRCNN; pendingAIInit = true; }
         else { currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
@@ -356,6 +419,9 @@ void Application::handleWin32Command(int menuId) {
         else { currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
     } else if (menuId == IDM_AI_SPATIAL_SHARP_BILINEAR) {
         if (currentAIType != AIType::SPATIAL_SHARP_BILINEAR) { currentAIType = AIType::SPATIAL_SHARP_BILINEAR; pendingAIInit = true; }
+        else { currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
+    } else if (menuId == IDM_AI_ANIME4K_TOGGLE) {
+        if (currentAIType != AIType::ANIME4K) { currentAIType = AIType::ANIME4K; pendingAIInit = true; }
         else { currentAIType = AIType::NONE; videoProcessor.releaseUpscaler(); }
     } else if (menuId == IDM_TARGET_1080) {
         srWidth = 1920; srHeight = 1080; currentAIType = AIType::NONE; videoProcessor.releaseUpscaler();
@@ -375,6 +441,7 @@ void Application::handleWin32Command(int menuId) {
         cfg.srHeight = srHeight;
         cfg.denoiseStrength = denoiseStrength;
         cfg.aiType = static_cast<int>(currentAIType);
+        cfg.rtxQuality = rtxQuality;
         cfg.enableDenoise = enableDenoise;
         cfg.enableAI = (currentAIType != AIType::NONE);
         cfg.enableFrameGeneration = enableFrameGeneration;
@@ -452,11 +519,12 @@ void Application::run() {
 
         if (pendingAIInit) {
             std::cout << "[App] Inicializando modelo SuperResolucion IA: " << (int)currentAIType << " ..." << std::endl;
-            if (!videoProcessor.initUpscaler(capWidth, capHeight, srWidth, srHeight, currentAIType)) {
+            if (!videoProcessor.initUpscaler(capWidth, capHeight, srWidth, srHeight, currentAIType, rtxQuality)) {
                 std::cout << "[App] Upscaler Fallo! Apagando flag." << std::endl;
                 currentAIType = AIType::NONE;
             }
             pendingAIInit = false;
+            updateWindowTitle();
             updateMenuChecks();
         }
 
@@ -576,4 +644,12 @@ void Application::handleInput() {
     char key = (char)cv::waitKey(1);
     if (key == 27) appWindow.toggleFullscreen();
     else if (key == 'q' || key == 'Q') isRunning = false;
+}
+
+void Application::scheduleRTXReinitIfActive() {
+    if (currentAIType == AIType::NVIDIA_RTX) {
+        videoProcessor.releaseUpscaler();
+        pendingAIInit = true;
+    }
+    updateWindowTitle();
 }

@@ -30,6 +30,8 @@ bool VideoProcessor::initUpscaler(int srcW, int srcH, int dstW, int dstH, AIType
 
         fsrcnnEnabled = cvUpscaler.initialize(absoluteModelPath, scale);
         return fsrcnnEnabled;
+    } else if (type == AIType::ANIME4K) {
+        return anime4kUpscaler.initialize(srcW, srcH, dstW, dstH);
     } else if (isSpatialType(type)) {
         return true;
     }
@@ -105,6 +107,18 @@ void VideoProcessor::processFrame(const cv::Mat& inputFrame, cv::Mat& outputFram
         return;
     }
 
+    // Anime4K
+    if (upscalerType == AIType::ANIME4K) {
+        const cv::Mat& animeInput = (enableDenoise && denoiser.denoise(inputFrame, denoiseInternalOutput))
+            ? denoiseInternalOutput
+            : inputFrame;
+
+        if (!anime4kUpscaler.processFrame(animeInput, outputFrame)) {
+            cv::resize(animeInput, outputFrame, cv::Size(upOutW, upOutH), 0, 0, cv::INTER_LANCZOS4);
+        }
+        return;
+    }
+
     // Escaladores espaciales ligeros
     if (isSpatialType(upscalerType)) {
         const cv::Mat& spatialInput = (enableDenoise && denoiser.denoise(inputFrame, denoiseInternalOutput))
@@ -130,6 +144,7 @@ bool VideoProcessor::isDenoiserReady() const {
 
 void VideoProcessor::releaseUpscaler() {
     upscaler.release();
+    anime4kUpscaler.release();
     cvUpscaler.release();
     fsrcnnEnabled = false;
 }

@@ -33,11 +33,21 @@
 #define IDM_TARGET_1080 5001
 #define IDM_TARGET_1440 5002
 #define IDM_TARGET_2160 5003
+#define IDM_RTX_QUALITY_BICUBIC 5020
+#define IDM_RTX_QUALITY_LOW 5021
+#define IDM_RTX_QUALITY_MEDIUM 5022
+#define IDM_RTX_QUALITY_HIGH 5023
+#define IDM_RTX_QUALITY_ULTRA 5024
+#define IDM_RTX_QUALITY_HB_LOW 5025
+#define IDM_RTX_QUALITY_HB_MEDIUM 5026
+#define IDM_RTX_QUALITY_HB_HIGH 5027
+#define IDM_RTX_QUALITY_HB_ULTRA 5028
 #define IDM_AI_SPATIAL_NEAREST 5010
 #define IDM_AI_SPATIAL_BILINEAR 5011
 #define IDM_AI_SPATIAL_BICUBIC 5012
 #define IDM_AI_SPATIAL_LANCZOS4 5013
 #define IDM_AI_SPATIAL_SHARP_BILINEAR 5014
+#define IDM_AI_ANIME4K_TOGGLE 5015
 
 #define IDM_SAVE_CONFIG 6000
 
@@ -76,6 +86,7 @@ private:
     int srWidth = 3840;
     int srHeight = 2160;
     float denoiseStrength = 0.0f;
+    int rtxQuality = GPUUpscaler::kModeMjpegDefault;
 
     std::vector<DeviceInfo> devices;
 
@@ -97,4 +108,5 @@ private:
     void refreshFormatAvailability();
     void applyNegotiatedCaptureState();
     void updateWindowTitle();
+    void scheduleRTXReinitIfActive();
 };

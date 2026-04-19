@@ -9,7 +9,14 @@
 // Escala 720p -> 1440p usando los Tensor Cores de la RTX 5070
 class GPUUpscaler {
 public:
+    static constexpr int kModeVsrBicubic = 0;
+    static constexpr int kModeVsrLow = 1;
+    static constexpr int kModeVsrMedium = 2;
+    static constexpr int kModeVsrHigh = 3;
     static constexpr int kModeVsrUltra = 4;
+    static constexpr int kModeHighBitrateLow = 16;
+    static constexpr int kModeHighBitrateMedium = 17;
+    static constexpr int kModeHighBitrateHigh = 18;
     static constexpr int kModeHighBitrateUltra = 19;
     static constexpr int kModeMjpegDefault = kModeVsrUltra;
 

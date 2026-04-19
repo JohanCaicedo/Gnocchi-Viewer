@@ -36,6 +36,7 @@ AppConfig ConfigManager::loadConfig(const std::string& filepath) {
             else if (key == "srHeight") config.srHeight = std::stoi(value);
             else if (key == "denoiseStrength") config.denoiseStrength = std::stof(value);
             else if (key == "aiType") config.aiType = std::stoi(value);
+            else if (key == "rtxQuality") config.rtxQuality = std::stoi(value);
             else if (key == "enableDenoise") config.enableDenoise = (value == "1" || value == "true");
             else if (key == "enableAI") config.enableAI = (value == "1" || value == "true");
             else if (key == "enableFrameGeneration") config.enableFrameGeneration = (value == "1" || value == "true");
@@ -66,6 +67,7 @@ void ConfigManager::saveConfig(const std::string& filepath, const AppConfig& con
     file << "srHeight=" << config.srHeight << "\n";
     file << "denoiseStrength=" << config.denoiseStrength << "\n";
     file << "aiType=" << config.aiType << "\n";
+    file << "rtxQuality=" << config.rtxQuality << "\n";
     file << "enableDenoise=" << (config.enableDenoise ? "1" : "0") << "\n";
     file << "enableAI=" << (config.enableAI ? "1" : "0") << "\n";
     file << "enableFrameGeneration=" << (config.enableFrameGeneration ? "1" : "0") << "\n";

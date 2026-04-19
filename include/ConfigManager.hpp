@@ -13,6 +13,7 @@ struct AppConfig {
     int srHeight = 2160;
     float denoiseStrength = 0.0f;
     int aiType = 0;
+    int rtxQuality = 4;
     bool enableDenoise = false;
     bool enableAI = false;
     bool enableFrameGeneration = false;
